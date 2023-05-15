@@ -1,0 +1,49 @@
+### Linting Job
+name: Zeus Pre-commit CI Workflow
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+  
+env:
+  HTTP_PROXY: http://web-proxy.corp.hpecorp.net:8080
+  
+jobs:
+  flake8-linter:
+    runs-on: [self-hosted, k8s]
+    container:
+      image: python:3.8-slim
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: install flake8
+        run: python3 -m pip install flake8 --proxy $HTTP_PROXY
+
+      - name: flake8 Linter
+        run: flake8 --max-line-length 180 .
+    
+  publish-pvt-repo:
+    runs-on: [self-hosted, k8s]
+    env:
+      COMMIT_ID: ${{ github.sha }}
+      BRANCH_NAME: ${{ github.head_ref }}
+    needs: flake8-linter
+    container:
+      image: python:3.8-slim
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: python3 -m pip install -U --disable-pip-version-check setuptools wheel twine --proxy $HTTP_PROXY
+      - name: Build package
+        run:  | 
+              python3 setup.py bdist_wheel && 
+              pwd &&
+              ls dist/
+              echo "Branch name:  ${{ github.head_ref }} Commit ID: ${{ github.sha }}"
+      
+      
